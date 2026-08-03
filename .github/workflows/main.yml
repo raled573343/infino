@@ -31,21 +31,11 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
-      # 🔍 ДИАГНОСТИКА: показать структуру каталогов
-      - name: List root directory
-        shell: pwsh
-        run: |
-          Write-Host "=== Contents of root ==="
-          Get-ChildItem -Path .
-          Write-Host "=== Contents of root (recursive, depth 2) ==="
-          Get-ChildItem -Path . -Recurse -Depth 2
-
-      # 🔍 ПОИСК ПАПКИ С БИНДИНГАМИ
       - name: Locate Python binding directory
         id: locate
         shell: pwsh
         run: |
-          $paths = @("bindings/python", "python", "infino-py", "py", "infino/bindings/python")
+          $paths = @("infino-python", "bindings/python", "python", "infino-py", "py")
           $found = $null
           foreach ($p in $paths) {
             if (Test-Path $p) {
@@ -61,12 +51,10 @@ jobs:
             exit 1
           }
 
-      # 🛠️ СБОРКА
       - name: Build wheel
         shell: pwsh
         run: |
           cd ${{ steps.locate.outputs.BINDING_DIR }}
-          # Явно указываем тип биндинга (PyO3)
           maturin build --release --out dist --target x86_64-pc-windows-msvc --bindings pyo3
         env:
           CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
