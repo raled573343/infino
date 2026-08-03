@@ -2,19 +2,19 @@ name: Build Python Wheels for Windows
 
 on:
   release:
-    types: [published]  # Запуск при создании релиза
+    types: [published]
   push:
-    branches: [ main ]  # Для тестирования можно запускать и при пуше в main
-  workflow_dispatch:    # Возможность запустить вручную
+    branches: [ main ]
+  workflow_dispatch:    # возможность запуска вручную
 
 jobs:
   build-wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build wheel on Windows (Python ${{ matrix.python-version }})
+    runs-on: windows-latest
     strategy:
       matrix:
-        os: [windows-latest]  # Можно добавить и другие ОС, если нужно
         python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        # можно добавить и другие, но для Windows достаточно latest
 
     steps:
       - uses: actions/checkout@v4
@@ -32,15 +32,37 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
-      - name: Build wheels
+      - name: Locate Python binding directory
+        id: locate
+        shell: pwsh
         run: |
-          cd bindings/python
+          $paths = @("bindings/python", "python", "infino-py", "py")
+          $found = $null
+          foreach ($p in $paths) {
+            if (Test-Path $p) {
+              $found = $p
+              break
+            }
+          }
+          if ($found) {
+            echo "BINDING_DIR=$found" >> $env:GITHUB_OUTPUT
+            echo "Found binding directory: $found"
+          } else {
+            # если не нашли, пробуем корень (надеемся, что там Cargo.toml с биндингами)
+            echo "BINDING_DIR=." >> $env:GITHUB_OUTPUT
+            echo "No specific binding directory found, using root."
+          }
+
+      - name: Build wheel
+        shell: pwsh
+        run: |
+          cd ${{ steps.locate.outputs.BINDING_DIR }}
           maturin build --release --out dist --target x86_64-pc-windows-msvc
         env:
           CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
 
-      - name: Upload wheels as artifacts
+      - name: Upload wheel as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.python-version }}
-          path: bindings/python/dist/*.whl
+          name: infino-wheel-py${{ matrix.python-version }}
+          path: ${{ steps.locate.outputs.BINDING_DIR }}/dist/*.whl
