@@ -1,0 +1,46 @@
+name: Build Python Wheels for Windows
+
+on:
+  release:
+    types: [published]  # Запуск при создании релиза
+  push:
+    branches: [ main ]  # Для тестирования можно запускать и при пуше в main
+  workflow_dispatch:    # Возможность запустить вручную
+
+jobs:
+  build-wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest]  # Можно добавить и другие ОС, если нужно
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Build wheels
+        run: |
+          cd bindings/python
+          maturin build --release --out dist --target x86_64-pc-windows-msvc
+        env:
+          CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
+
+      - name: Upload wheels as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.python-version }}
+          path: bindings/python/dist/*.whl
